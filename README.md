@@ -139,32 +139,6 @@ const sequence = beep
 const output = sequence.toWav();
 ```
 
-## What's Inside
-
-The DSP is hand-written TypeScript implementing broadcast standards:
-
-- **Loudness measurement**: ITU-R BS.1770-4 / EBU R128 with K-weighting, 400ms gated blocks, dual gating (absolute at -70 LUFS, relative at -10 LU)
-- **True peak detection**: 4x oversampling via polyphase FIR interpolation with Kaiser-windowed sinc filter — catches intersample peaks that sample-level detection misses
-- **True peak limiting**: Stereo-matched gain reduction to preserve stereo image
-- **Silence detection**: Windowed RMS scanning (not sample-level) for robust detection that ignores brief transients
-
-## Defaults
-
-| Parameter               | Default   | Why                             |
-| ----------------------- | --------- | ------------------------------- |
-| `normalize.target`      | -14 LUFS  | EBU R128 foreground standard    |
-| `normalize.peakLimit`   | -1.5 dBTP | Headroom for DAC reconstruction |
-| `trimSilence.threshold` | -30 dB    | Catches low-level padding noise |
-| `trimSilence.headMs`    | 10 ms     | Preserves natural attack        |
-| `trimSilence.tailMs`    | 50 ms     | Preserves natural decay         |
-| `toMp3.bitrate`         | 128 kbps  | Good quality/size balance       |
-
-## Docs
-
-- [API Reference](./API.md) — Full API documentation with all methods, options, and examples
-- [Development Guide](./DEVELOPMENT.md) — How to build this library from scratch with TDD
-- [Release Guide](./RELEASE.md) — How to package and publish to npm
-
 ## License
 
 MIT
