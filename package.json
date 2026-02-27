@@ -1,0 +1,56 @@
+{
+  "name": "neiro",
+  "version": "0.1.0",
+  "description": "Audio processing library for TypeScript. Loudness normalization, true peak limiting, silence trimming, and more. Runs anywhere — serverless, Edge, Node.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "bun run build"
+  },
+  "keywords": [
+    "audio",
+    "loudness",
+    "lufs",
+    "normalization",
+    "true-peak",
+    "silence-trimming",
+    "dsp",
+    "typescript",
+    "serverless"
+  ],
+  "license": "MIT",
+  "author": "",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.2",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "vite-plugin-dts": "^4.5.4",
+    "vitest": "^4.0.18"
+  },
+  "dependencies": {
+    "@breezystack/lamejs": "^1.2.7",
+    "audio-decode": "^2.2.3"
+  }
+}
