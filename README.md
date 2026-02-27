@@ -21,10 +21,13 @@ import { AudioTrack } from "neiro";
 import { readFileSync, writeFileSync } from "fs";
 
 const buffer = readFileSync("input.mp3");
-const track = await AudioTrack.fromBuffer(buffer);
+const track = await AudioTrack.fromBuffer({ buffer });
 
 // Normalize loudness, trim silence, fade out
-const result = track.normalize({ target: -14 }).trimSilence().fadeOut(10);
+const result = track
+  .normalize({ target: -14 })
+  .trimSilence()
+  .fadeOut({ ms: 10 });
 
 writeFileSync("output.mp3", result.toMp3());
 ```
@@ -39,11 +42,16 @@ Two small runtime dependencies handle MP3 codec work: `lamejs` for encoding and 
 
 ## API at a Glance
 
+Every method takes a single object argument — you always know what each value means, and you get full autocomplete.
+
 ```typescript
 // Load
-const track = await AudioTrack.fromBuffer(mp3OrWavBuffer);
-const track = AudioTrack.fromChannels([leftSamples], { sampleRate: 44100 });
-const track = AudioTrack.silence(500);
+const track = await AudioTrack.fromBuffer({ buffer: mp3OrWavBuffer });
+const track = AudioTrack.fromChannels({
+  channels: [leftSamples],
+  sampleRate: 44100,
+});
+const track = AudioTrack.silence({ durationMs: 500 });
 
 // Measure
 track.loudness(); // Integrated LUFS (ITU-R BS.1770-4)
@@ -56,14 +64,14 @@ track.channels; // 1 (mono) or 2 (stereo)
 // Transform (each returns a new AudioTrack — immutable)
 track.normalize({ target: -14, peakLimit: -1.5 });
 track.trimSilence({ threshold: -30, headMs: 10, tailMs: 50 });
-track.gain(6); // +6 dB
-track.fadeIn(5); // 5ms fade-in
-track.fadeOut(10); // 10ms fade-out
-track.slice(0, 2000); // First 2 seconds
-track.concat(other); // Join end-to-end
-track.mix(other); // Overlay
+track.gain({ db: 6 }); // +6 dB
+track.fadeIn({ ms: 5 }); // 5ms fade-in
+track.fadeOut({ ms: 10 }); // 10ms fade-out
+track.slice({ startMs: 0, endMs: 2000 }); // First 2 seconds
+track.concat({ other }); // Join end-to-end
+track.mix({ other }); // Overlay
 track.reverse();
-track.speed(1.5); // 1.5x speed (no pitch preservation)
+track.speed({ rate: 1.5 }); // 1.5x speed (no pitch preservation)
 
 // Export
 track.toMp3({ bitrate: 128 }); // Buffer
@@ -76,8 +84,8 @@ All transforms chain:
 ```typescript
 const output = track
   .normalize({ target: -20 })
-  .fadeIn(500)
-  .fadeOut(2000)
+  .fadeIn({ ms: 500 })
+  .fadeOut({ ms: 2000 })
   .toMp3({ bitrate: 192 });
 ```
 
@@ -86,27 +94,30 @@ const output = track
 ### Normalize a sound effect
 
 ```typescript
-const sfx = await AudioTrack.fromBuffer(raw);
+const sfx = await AudioTrack.fromBuffer({ buffer: raw });
 const processed = sfx
   .normalize({ target: -14, peakLimit: -1.5 })
   .trimSilence()
-  .fadeIn(5)
-  .fadeOut(10);
+  .fadeIn({ ms: 5 })
+  .fadeOut({ ms: 10 });
 const output = processed.toMp3();
 ```
 
 ### Prepare background music
 
 ```typescript
-const music = await AudioTrack.fromBuffer(raw);
-const processed = music.normalize({ target: -20 }).fadeIn(500).fadeOut(2000);
+const music = await AudioTrack.fromBuffer({ buffer: raw });
+const processed = music
+  .normalize({ target: -20 })
+  .fadeIn({ ms: 500 })
+  .fadeOut({ ms: 2000 });
 const output = processed.toMp3({ bitrate: 192 });
 ```
 
 ### Analyze loudness
 
 ```typescript
-const track = await AudioTrack.fromBuffer(buffer);
+const track = await AudioTrack.fromBuffer({ buffer });
 console.log(`Loudness: ${track.loudness()} LUFS`);
 console.log(`True peak: ${track.truePeak()} dBTP`);
 console.log(`Duration: ${track.duration}s`);
@@ -115,9 +126,16 @@ console.log(`Duration: ${track.duration}s`);
 ### Build a sequence
 
 ```typescript
-const beep = await AudioTrack.fromBuffer(beepMp3);
-const gap = AudioTrack.silence(300, { sampleRate: beep.sampleRate });
-const sequence = beep.concat(gap).concat(beep).concat(gap).concat(beep);
+const beep = await AudioTrack.fromBuffer({ buffer: beepMp3 });
+const gap = AudioTrack.silence({
+  durationMs: 300,
+  sampleRate: beep.sampleRate,
+});
+const sequence = beep
+  .concat({ other: gap })
+  .concat({ other: beep })
+  .concat({ other: gap })
+  .concat({ other: beep });
 const output = sequence.toWav();
 ```
 

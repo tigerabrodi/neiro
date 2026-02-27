@@ -95,7 +95,7 @@ import { AudioTrack } from "neiro";
 import { readFileSync } from "fs";
 
 const buffer = readFileSync("test.mp3");
-const track = await AudioTrack.fromBuffer(buffer);
+const track = await AudioTrack.fromBuffer({ buffer });
 console.log(`Loudness: ${track.loudness()} LUFS`);
 console.log(`Duration: ${track.duration}s`);
 

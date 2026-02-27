@@ -346,18 +346,21 @@ Wire everything together. The `AudioTrack` class is a thin wrapper that delegate
 
 #### 4.1 — `src/audio-track.ts`
 
+Every public method takes a single object argument (except no-arg methods like `reverse()`, `toWav()`, measurement getters). This ensures type safety and autocomplete at every call site.
+
 ```typescript
 class AudioTrack {
   // Construction
-  static fromBuffer(buffer: Buffer): Promise<AudioTrack>;
-  static fromChannels(
-    channels: Float32Array[],
-    options: { sampleRate: number },
-  ): AudioTrack;
-  static silence(
-    durationMs: number,
-    options?: { sampleRate?: number; channels?: number },
-  ): AudioTrack;
+  static fromBuffer(opts: { buffer: Buffer }): Promise<AudioTrack>;
+  static fromChannels(opts: {
+    channels: Float32Array[];
+    sampleRate: number;
+  }): AudioTrack;
+  static silence(opts: {
+    durationMs: number;
+    sampleRate?: number;
+    channels?: number;
+  }): AudioTrack;
 
   // Properties
   get duration(): number;
@@ -369,26 +372,26 @@ class AudioTrack {
   loudness(): number;
   truePeak(): number;
   rms(): number;
-  getChannel(index: number): Float32Array;
+  getChannel(opts: { index: number }): Float32Array;
 
   // Transforms
-  gain(db: number): AudioTrack;
-  normalize(options?: { target?: number; peakLimit?: number }): AudioTrack;
-  trimSilence(options?: {
+  gain(opts: { db: number }): AudioTrack;
+  normalize(opts?: { target?: number; peakLimit?: number }): AudioTrack;
+  trimSilence(opts?: {
     threshold?: number;
     headMs?: number;
     tailMs?: number;
   }): AudioTrack;
-  fadeIn(ms: number): AudioTrack;
-  fadeOut(ms: number): AudioTrack;
-  slice(startMs: number, endMs?: number): AudioTrack;
-  concat(other: AudioTrack): AudioTrack;
-  mix(other: AudioTrack, options?: { gainDb?: number }): AudioTrack;
+  fadeIn(opts: { ms: number }): AudioTrack;
+  fadeOut(opts: { ms: number }): AudioTrack;
+  slice(opts: { startMs: number; endMs?: number }): AudioTrack;
+  concat(opts: { other: AudioTrack }): AudioTrack;
+  mix(opts: { other: AudioTrack; gainDb?: number }): AudioTrack;
   reverse(): AudioTrack;
-  speed(rate: number): AudioTrack;
+  speed(opts: { rate: number }): AudioTrack;
 
   // Export
-  toMp3(options?: { bitrate?: number }): Buffer;
+  toMp3(opts?: { bitrate?: number }): Buffer;
   toWav(): Buffer;
   toPcm(): { channels: Float32Array[]; sampleRate: number };
 }
@@ -398,9 +401,9 @@ class AudioTrack {
 
 - Full chain: `fromBuffer → normalize → trimSilence → fadeOut → toMp3` produces valid MP3
 - `fromChannels → toWav → fromBuffer` round-trips correctly
-- `silence(1000).duration` is approximately 1.0
+- `silence({ durationMs: 1000 }).duration` is approximately 1.0
 - Immutability: original track is unchanged after transforms
-- Method chaining works: `track.gain(6).fadeIn(5).fadeOut(10)`
+- Method chaining works: `track.gain({ db: 6 }).fadeIn({ ms: 5 }).fadeOut({ ms: 10 })`
 - Error cases: mismatched concat, invalid channel index
 
 #### 4.2 — `src/index.ts`

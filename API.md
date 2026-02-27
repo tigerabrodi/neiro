@@ -9,12 +9,17 @@ Everything revolves around `AudioTrack` — an immutable object holding PCM audi
 ```typescript
 import { AudioTrack } from "neiro";
 
-const track = await AudioTrack.fromBuffer(mp3Buffer);
+const track = await AudioTrack.fromBuffer({ buffer: mp3Buffer });
 
-const result = track.normalize({ target: -14 }).trimSilence().fadeOut(10);
+const result = track
+  .normalize({ target: -14 })
+  .trimSilence()
+  .fadeOut({ ms: 10 });
 
 const output = result.toMp3({ bitrate: 128 });
 ```
+
+Every method takes a single object argument. This gives you type safety and autocomplete at every call site — you always know what each value means.
 
 Every transform returns a **new** `AudioTrack`. The original is never mutated.
 
@@ -22,56 +27,71 @@ Every transform returns a **new** `AudioTrack`. The original is never mutated.
 
 ## Construction
 
-### `AudioTrack.fromBuffer(buffer)`
+### `AudioTrack.fromBuffer({ buffer })`
 
 Decode a compressed audio buffer (MP3, WAV, OGG, FLAC) into an `AudioTrack`.
 
 ```typescript
-const track = await AudioTrack.fromBuffer(buffer: Buffer): Promise<AudioTrack>
+const track = await AudioTrack.fromBuffer({
+  buffer: Buffer;
+}): Promise<AudioTrack>
 ```
 
 This is async because decoding compressed audio requires parsing frame headers, Huffman tables, etc. Format is auto-detected from the buffer contents.
 
-### `AudioTrack.fromChannels(channels, options)`
+```typescript
+const track = await AudioTrack.fromBuffer({ buffer });
+```
+
+### `AudioTrack.fromChannels({ channels, sampleRate })`
 
 Create an `AudioTrack` from raw PCM data. Use this when you already have decoded samples.
 
 ```typescript
-const track = AudioTrack.fromChannels(
-  channels: Float32Array[],  // [left] for mono, [left, right] for stereo
-  options: { sampleRate: number }
-): AudioTrack
+const track = AudioTrack.fromChannels({
+  channels: Float32Array[];  // [left] for mono, [left, right] for stereo
+  sampleRate: number;
+}): AudioTrack
 ```
 
 Samples must be normalized to the `-1.0` to `1.0` range.
 
 ```typescript
 // Mono track from raw samples
-const mono = AudioTrack.fromChannels([samples], { sampleRate: 44100 });
+const mono = AudioTrack.fromChannels({
+  channels: [samples],
+  sampleRate: 44100,
+});
 
 // Stereo track
-const stereo = AudioTrack.fromChannels([left, right], { sampleRate: 48000 });
+const stereo = AudioTrack.fromChannels({
+  channels: [left, right],
+  sampleRate: 48000,
+});
 ```
 
-### `AudioTrack.silence(durationMs, options?)`
+### `AudioTrack.silence({ durationMs, ... })`
 
 Generate a silent track. Useful as a building block with `concat()` and `mix()`.
 
 ```typescript
-const gap = AudioTrack.silence(
-  durationMs: number,
-  options?: { sampleRate?: number; channels?: number }
-): AudioTrack
+const gap = AudioTrack.silence({
+  durationMs: number;
+  sampleRate?: number;  // default: 44100
+  channels?: number;    // default: 1
+}): AudioTrack
 ```
-
-Defaults: `sampleRate: 44100`, `channels: 1`.
 
 ```typescript
 // 500ms of silence
-const gap = AudioTrack.silence(500);
+const gap = AudioTrack.silence({ durationMs: 500 });
 
 // 1 second of stereo silence at 48kHz
-const gap = AudioTrack.silence(1000, { sampleRate: 48000, channels: 2 });
+const gap = AudioTrack.silence({
+  durationMs: 1000,
+  sampleRate: 48000,
+  channels: 2,
+});
 ```
 
 ---
@@ -88,7 +108,7 @@ Read-only properties on every `AudioTrack` instance.
 | `length`     | `number` | Total samples per channel              |
 
 ```typescript
-const track = await AudioTrack.fromBuffer(mp3Buffer);
+const track = await AudioTrack.fromBuffer({ buffer: mp3Buffer });
 track.duration; // 4.2
 track.sampleRate; // 44100
 track.channels; // 2
@@ -99,7 +119,7 @@ track.length; // 185220
 
 ## Measurement
 
-Methods that analyze the audio without modifying it.
+Methods that analyze the audio without modifying it. These take no arguments.
 
 ### `track.loudness()`
 
@@ -149,12 +169,12 @@ Returns the RMS level in dB across all channels.
 track.rms(); // -18.5
 ```
 
-### `track.getChannel(index)`
+### `track.getChannel({ index })`
 
 Access raw PCM samples for a specific channel.
 
 ```typescript
-track.getChannel(index: number): Float32Array
+track.getChannel({ index: number }): Float32Array
 ```
 
 Returns a **copy** of the channel data (the track remains immutable).
@@ -165,37 +185,37 @@ Returns a **copy** of the channel data (the track remains immutable).
 Throws if the index is out of range.
 
 ```typescript
-const leftSamples = track.getChannel(0);
-const rightSamples = track.getChannel(1);
+const leftSamples = track.getChannel({ index: 0 });
+const rightSamples = track.getChannel({ index: 1 });
 ```
 
 ---
 
 ## Transforms
 
-Every transform returns a new `AudioTrack`. They can be chained.
+Every transform returns a new `AudioTrack`. They can be chained. Every method takes a single object argument.
 
-### `track.gain(db)`
+### `track.gain({ db })`
 
 Apply gain (volume adjustment) in decibels.
 
 ```typescript
-track.gain(db: number): AudioTrack
+track.gain({ db: number }): AudioTrack
 ```
 
 Positive values boost, negative values attenuate. No clipping protection — use `normalize()` if you need peak limiting.
 
 ```typescript
-track.gain(6); // +6 dB (roughly doubles perceived loudness)
-track.gain(-3); // -3 dB (roughly halves power)
+track.gain({ db: 6 }); // +6 dB (roughly doubles perceived loudness)
+track.gain({ db: -3 }); // -3 dB (roughly halves power)
 ```
 
-### `track.normalize(options?)`
+### `track.normalize({ target?, peakLimit? })`
 
 Normalize loudness to a target LUFS with true peak limiting.
 
 ```typescript
-track.normalize(options?: {
+track.normalize({
   target?: number;     // Target LUFS (default: -14)
   peakLimit?: number;  // True peak ceiling in dBTP (default: -1.5)
 }): AudioTrack
@@ -223,12 +243,12 @@ track.normalize({ target: -20 });
 track.normalize({ target: -14, peakLimit: -1.0 });
 ```
 
-### `track.trimSilence(options?)`
+### `track.trimSilence({ threshold?, headMs?, tailMs? })`
 
 Remove leading and trailing silence.
 
 ```typescript
-track.trimSilence(options?: {
+track.trimSilence({
   threshold?: number;  // Silence threshold in dB (default: -30)
   headMs?: number;     // Buffer to keep before content (default: 10)
   tailMs?: number;     // Buffer to keep after content (default: 50)
@@ -253,99 +273,99 @@ track.trimSilence({ threshold: -20, headMs: 5 });
 track.trimSilence({ tailMs: 200 });
 ```
 
-### `track.fadeIn(ms)`
+### `track.fadeIn({ ms })`
 
 Apply a linear fade-in from silence.
 
 ```typescript
-track.fadeIn(ms: number): AudioTrack
+track.fadeIn({ ms: number }): AudioTrack
 ```
 
 Ramps gain from 0 to 1 over the specified duration. Use after `trimSilence()` to prevent clicks at the trim point.
 
 ```typescript
-track.fadeIn(5); // 5ms fade-in (click prevention)
-track.fadeIn(500); // 500ms fade-in (artistic)
+track.fadeIn({ ms: 5 }); // 5ms fade-in (click prevention)
+track.fadeIn({ ms: 500 }); // 500ms fade-in (artistic)
 ```
 
-### `track.fadeOut(ms)`
+### `track.fadeOut({ ms })`
 
 Apply a linear fade-out to silence.
 
 ```typescript
-track.fadeOut(ms: number): AudioTrack
+track.fadeOut({ ms: number }): AudioTrack
 ```
 
 Ramps gain from 1 to 0 over the specified duration at the end of the track.
 
 ```typescript
-track.fadeOut(10); // 10ms fade-out (click prevention)
-track.fadeOut(2000); // 2 second fade-out (song ending)
+track.fadeOut({ ms: 10 }); // 10ms fade-out (click prevention)
+track.fadeOut({ ms: 2000 }); // 2 second fade-out (song ending)
 ```
 
-### `track.slice(startMs, endMs?)`
+### `track.slice({ startMs, endMs? })`
 
 Extract a segment of the track.
 
 ```typescript
-track.slice(
-  startMs: number,
-  endMs?: number  // Defaults to end of track
-): AudioTrack
+track.slice({
+  startMs: number;
+  endMs?: number;  // Defaults to end of track
+}): AudioTrack
 ```
 
 Returns a new track containing only the audio between `startMs` and `endMs`.
 
 ```typescript
 // First 2 seconds
-track.slice(0, 2000);
+track.slice({ startMs: 0, endMs: 2000 });
 
 // Everything after the first second
-track.slice(1000);
+track.slice({ startMs: 1000 });
 
 // A 500ms segment starting at 3 seconds
-track.slice(3000, 3500);
+track.slice({ startMs: 3000, endMs: 3500 });
 ```
 
-### `track.concat(other)`
+### `track.concat({ other })`
 
 Join two tracks end-to-end.
 
 ```typescript
-track.concat(other: AudioTrack): AudioTrack
+track.concat({ other: AudioTrack }): AudioTrack
 ```
 
 The tracks must have the same sample rate and channel count. Throws if they don't match.
 
 ```typescript
-const intro = await AudioTrack.fromBuffer(introMp3);
-const body = await AudioTrack.fromBuffer(bodyMp3);
-const full = intro.concat(body);
+const intro = await AudioTrack.fromBuffer({ buffer: introMp3 });
+const body = await AudioTrack.fromBuffer({ buffer: bodyMp3 });
+const full = intro.concat({ other: body });
 ```
 
-### `track.mix(other, options?)`
+### `track.mix({ other, gainDb? })`
 
 Mix (overlay) another track on top of this one.
 
 ```typescript
-track.mix(
-  other: AudioTrack,
-  options?: { gainDb?: number }  // Gain applied to `other` before mixing (default: 0)
-): AudioTrack
+track.mix({
+  other: AudioTrack;
+  gainDb?: number;  // Gain applied to `other` before mixing (default: 0)
+}): AudioTrack
 ```
 
 Adds the samples together. The output length is the longer of the two tracks. The tracks must have the same sample rate and channel count.
 
 ```typescript
 // Layer background ambience under dialogue
-const dialogue = await AudioTrack.fromBuffer(dialogueMp3);
-const ambience = await AudioTrack.fromBuffer(ambienceMp3);
-const mixed = dialogue.mix(ambience, { gainDb: -6 });
+const dialogue = await AudioTrack.fromBuffer({ buffer: dialogueMp3 });
+const ambience = await AudioTrack.fromBuffer({ buffer: ambienceMp3 });
+const mixed = dialogue.mix({ other: ambience, gainDb: -6 });
 ```
 
 ### `track.reverse()`
 
-Reverse the audio.
+Reverse the audio. Takes no arguments.
 
 ```typescript
 track.reverse(): AudioTrack
@@ -355,12 +375,12 @@ track.reverse(): AudioTrack
 const reversed = track.reverse();
 ```
 
-### `track.speed(rate)`
+### `track.speed({ rate })`
 
 Change playback speed by resampling. Does not preserve pitch.
 
 ```typescript
-track.speed(rate: number): AudioTrack
+track.speed({ rate: number }): AudioTrack
 ```
 
 `rate > 1` = faster and higher pitched. `rate < 1` = slower and lower pitched. Uses linear interpolation for resampling.
@@ -368,22 +388,22 @@ track.speed(rate: number): AudioTrack
 The output sample rate stays the same — the duration changes.
 
 ```typescript
-track.speed(2); // Double speed, half duration, octave up
-track.speed(0.5); // Half speed, double duration, octave down
-track.speed(1.5); // 1.5x speed
+track.speed({ rate: 2 }); // Double speed, half duration, octave up
+track.speed({ rate: 0.5 }); // Half speed, double duration, octave down
+track.speed({ rate: 1.5 }); // 1.5x speed
 ```
 
 ---
 
 ## Export
 
-### `track.toMp3(options?)`
+### `track.toMp3({ bitrate? })`
 
 Encode the track to MP3.
 
 ```typescript
-track.toMp3(options?: {
-  bitrate?: number  // kbps (default: 128)
+track.toMp3({
+  bitrate?: number;  // kbps (default: 128)
 }): Buffer
 ```
 
@@ -394,7 +414,7 @@ const hq = track.toMp3({ bitrate: 320 }); // 320 kbps
 
 ### `track.toWav()`
 
-Encode the track to WAV (16-bit PCM).
+Encode the track to WAV (16-bit PCM). Takes no arguments.
 
 ```typescript
 track.toWav(): Buffer
@@ -408,7 +428,7 @@ const wav = track.toWav();
 
 ### `track.toPcm()`
 
-Get the raw PCM data and metadata.
+Get the raw PCM data and metadata. Takes no arguments.
 
 ```typescript
 track.toPcm(): {
@@ -431,13 +451,13 @@ const { channels, sampleRate } = track.toPcm();
 ### Normalize a sound effect for a game
 
 ```typescript
-const sfx = await AudioTrack.fromBuffer(raw);
+const sfx = await AudioTrack.fromBuffer({ buffer: raw });
 
 const processed = sfx
   .normalize({ target: -14, peakLimit: -1.5 })
   .trimSilence({ threshold: -30, headMs: 10, tailMs: 50 })
-  .fadeIn(5)
-  .fadeOut(10);
+  .fadeIn({ ms: 5 })
+  .fadeOut({ ms: 10 });
 
 const output = processed.toMp3({ bitrate: 128 });
 ```
@@ -445,9 +465,12 @@ const output = processed.toMp3({ bitrate: 128 });
 ### Prepare background music
 
 ```typescript
-const music = await AudioTrack.fromBuffer(raw);
+const music = await AudioTrack.fromBuffer({ buffer: raw });
 
-const processed = music.normalize({ target: -20 }).fadeIn(500).fadeOut(2000);
+const processed = music
+  .normalize({ target: -20 })
+  .fadeIn({ ms: 500 })
+  .fadeOut({ ms: 2000 });
 
 const output = processed.toMp3({ bitrate: 192 });
 ```
@@ -455,10 +478,17 @@ const output = processed.toMp3({ bitrate: 192 });
 ### Build a sequence with gaps
 
 ```typescript
-const beep = await AudioTrack.fromBuffer(beepMp3);
-const gap = AudioTrack.silence(300, { sampleRate: beep.sampleRate });
+const beep = await AudioTrack.fromBuffer({ buffer: beepMp3 });
+const gap = AudioTrack.silence({
+  durationMs: 300,
+  sampleRate: beep.sampleRate,
+});
 
-const sequence = beep.concat(gap).concat(beep).concat(gap).concat(beep);
+const sequence = beep
+  .concat({ other: gap })
+  .concat({ other: beep })
+  .concat({ other: gap })
+  .concat({ other: beep });
 
 const output = sequence.toWav();
 ```
@@ -466,7 +496,7 @@ const output = sequence.toWav();
 ### Analyze loudness without transforming
 
 ```typescript
-const track = await AudioTrack.fromBuffer(buffer);
+const track = await AudioTrack.fromBuffer({ buffer });
 
 console.log(`Loudness: ${track.loudness()} LUFS`);
 console.log(`True Peak: ${track.truePeak()} dBTP`);
