@@ -1,5 +1,5 @@
 {
-  "name": "neiro",
+  "name": "@tigerabrodioss/neiro",
   "version": "0.1.0",
   "description": "Audio processing library for TypeScript. Loudness normalization, true peak limiting, silence trimming, and more. Runs anywhere — serverless, Edge, Node.",
   "type": "module",

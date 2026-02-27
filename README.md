@@ -9,15 +9,15 @@ Runs anywhere: Node.js, Vercel, Cloudflare Workers, any serverless runtime.
 ## Install
 
 ```bash
-bun add neiro
+bun add @tigerabrodioss/neiro
 # or
-npm install neiro
+npm install @tigerabrodioss/neiro
 ```
 
 ## Quick Start
 
 ```typescript
-import { AudioTrack } from "neiro";
+import { AudioTrack } from "@tigerabrodioss/neiro";
 import { readFileSync, writeFileSync } from "fs";
 
 const buffer = readFileSync("input.mp3");
