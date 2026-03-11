@@ -63,7 +63,7 @@ track.channels; // 1 (mono) or 2 (stereo)
 
 // Transform (each returns a new AudioTrack — immutable)
 track.normalize({ target: -14, peakLimit: -1.5 });
-track.trimSilence({ threshold: -30, headMs: 10, tailMs: 50 });
+track.trimSilence({ thresholdDb: -30, headMs: 10, tailMs: 50 });
 track.gain({ db: 6 }); // +6 dB
 track.fadeIn({ ms: 5 }); // 5ms fade-in
 track.fadeOut({ ms: 10 }); // 10ms fade-out
@@ -78,6 +78,8 @@ track.toMp3({ bitrate: 128 }); // Buffer
 track.toWav(); // Buffer
 track.toPcm(); // { channels: Float32Array[], sampleRate }
 ```
+
+`trimSilence()` uses internal 10ms RMS analysis windows, with defaults of `thresholdDb: -30`, `headMs: 10`, and `tailMs: 50`. It trims based on window loudness rather than individual sample peaks, which makes it more stable around brief transients.
 
 All transforms chain:
 
@@ -98,7 +100,6 @@ const sfx = await AudioTrack.fromBuffer({ buffer: raw });
 const processed = sfx
   .normalize({ target: -14, peakLimit: -1.5 })
   .trimSilence()
-  .fadeIn({ ms: 5 })
   .fadeOut({ ms: 10 });
 const output = processed.toMp3();
 ```

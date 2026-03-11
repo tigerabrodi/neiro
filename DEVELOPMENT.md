@@ -326,17 +326,22 @@ normalizeLoudness(
 trimSilence(
   channels: Float32Array[],
   sampleRate: number,
-  options?: { threshold?: number; headMs?: number; tailMs?: number }
+  options?: { thresholdDb?: number; headMs?: number; tailMs?: number }
 ): Float32Array[]
 ```
 
+Use fixed 10ms RMS windows internally. Compute RMS per channel for each window, use the loudest channel as the window level, and trim around the first/last windows that exceed `thresholdDb`.
+
 **Tests:**
 
-- Leading silence is removed
-- Trailing silence is removed
-- Content in the middle is preserved
-- Head/tail buffers are kept
-- No-op if no significant silence
+- Default behavior keeps 10ms head and 50ms tail
+- `thresholdDb` is interpreted in dB
+- Single-sample spikes do not block trimming
+- Stereo content in one channel is preserved
+- All-silence input returns unchanged audio
+- Short clips smaller than one window behave sensibly
+- Negative `headMs` / `tailMs` throw
+- Positive `thresholdDb` throws
 
 ---
 
@@ -378,7 +383,7 @@ class AudioTrack {
   gain(opts: { db: number }): AudioTrack;
   normalize(opts?: { target?: number; peakLimit?: number }): AudioTrack;
   trimSilence(opts?: {
-    threshold?: number;
+    thresholdDb?: number;
     headMs?: number;
     tailMs?: number;
   }): AudioTrack;

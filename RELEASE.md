@@ -69,7 +69,7 @@ To create the tarball locally and inspect it:
 
 ```bash
 npm pack
-tar -tzf neiro-0.1.0.tgz
+tar -tzf neiro-0.2.0.tgz
 ```
 
 ## Test the Package Locally
@@ -85,7 +85,7 @@ npm pack
 
 # 3. In another project, install from the tarball
 cd /path/to/test-project
-bun add /path/to/neiro/neiro-0.1.0.tgz
+bun add /path/to/neiro/neiro-0.2.0.tgz
 ```
 
 Then write a quick test script:
@@ -136,7 +136,7 @@ npm whoami
 
 ```bash
 # Make sure version is correct in package.json
-# (should be 0.1.0 for the first release)
+# (currently 0.2.0 for the trimSilence API rewrite release)
 
 # Build
 bun run build
@@ -152,7 +152,7 @@ The `--access public` flag is needed for scoped packages or first-time publishes
 ```bash
 # Bump version
 npm version patch   # 0.1.0 → 0.1.1 (bug fixes)
-npm version minor   # 0.1.1 → 0.2.0 (new features, backwards compatible)
+npm version minor   # 0.1.1 → 0.2.0 (pre-1.0 feature or breaking release)
 npm version major   # 0.2.0 → 1.0.0 (breaking changes)
 
 # Build and publish
@@ -168,14 +168,15 @@ Follow [semver](https://semver.org/):
 
 - **0.x.y** — Pre-1.0, anything can change. Use this while iterating on the API.
 - **0.1.0** — First usable release. API is defined but may evolve.
+- **0.2.0** — Breaking `trimSilence` API rewrite: `thresholdDb` + RMS-window detection.
 - **1.0.0** — Stable API. You're committing to backwards compatibility.
 
 Suggested milestones:
 
 | Version | Milestone                                                  |
 | ------- | ---------------------------------------------------------- |
-| `0.1.0` | Core API works: normalize, trim, fade, gain, slice, export |
-| `0.2.0` | concat, mix, reverse, speed added                          |
+| `0.1.0` | Initial public release                                     |
+| `0.2.0` | Breaking `trimSilence` rewrite to `thresholdDb` + RMS trim |
 | `0.3.0` | Performance optimizations, edge case fixes                 |
 | `1.0.0` | Battle-tested in production, API is stable                 |
 
@@ -199,7 +200,7 @@ After publishing to npm, create a GitHub release:
 git push origin main --tags
 
 # Create release on GitHub
-gh release create v0.1.0 --title "v0.1.0" --notes "Initial release"
+gh release create v0.2.0 --title "v0.2.0" --notes "Breaking trimSilence API rewrite"
 ```
 
 ## Troubleshooting

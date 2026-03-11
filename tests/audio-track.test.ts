@@ -17,6 +17,23 @@ function generateSineWave(
   return samples;
 }
 
+function createPaddedConstantTone(
+  leadingMs: number,
+  toneMs: number,
+  trailingMs: number,
+  sampleRate: number,
+  amplitude: number,
+): Float32Array {
+  const leadingSamples = Math.floor((leadingMs / 1000) * sampleRate);
+  const toneSamples = Math.floor((toneMs / 1000) * sampleRate);
+  const trailingSamples = Math.floor((trailingMs / 1000) * sampleRate);
+  const output = new Float32Array(
+    leadingSamples + toneSamples + trailingSamples,
+  );
+  output.fill(amplitude, leadingSamples, leadingSamples + toneSamples);
+  return output;
+}
+
 describe("AudioTrack", () => {
   it("full chain: fromBuffer → normalize → trimSilence → fadeOut → toMp3 produces valid MP3", async () => {
     const sampleRate = 44100;
@@ -41,6 +58,28 @@ describe("AudioTrack", () => {
     expect(decoded.sampleRate).toBeGreaterThan(0);
     expect(decoded.channels).toBeGreaterThanOrEqual(1);
     expect(decoded.duration).toBeGreaterThan(0);
+  });
+
+  it("trimSilence uses thresholdDb and default head/tail padding through the AudioTrack API", () => {
+    const sampleRate = 1000;
+    const padded = createPaddedConstantTone(40, 30, 80, sampleRate, 0.25);
+    const track = AudioTrack.fromChannels({
+      channels: [padded],
+      sampleRate,
+    });
+
+    const defaultTrimmed = track.trimSilence();
+    const customTrimmed = track.trimSilence({
+      thresholdDb: -20,
+      headMs: 0,
+      tailMs: 0,
+    });
+
+    expect(defaultTrimmed.length).toBe(90);
+    expect(customTrimmed.length).toBe(30);
+    expect(Array.from(customTrimmed.getChannel({ index: 0 }))).toEqual(
+      new Array(30).fill(0.25),
+    );
   });
 
   it("WAV round-trip: fromChannels → toWav → fromBuffer preserves data within 16-bit quantization", async () => {

@@ -136,7 +136,7 @@ export class AudioTrack {
   }
 
   trimSilence(opts?: {
-    threshold?: number;
+    thresholdDb?: number;
     headMs?: number;
     tailMs?: number;
   }): AudioTrack {

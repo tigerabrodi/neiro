@@ -243,31 +243,31 @@ track.normalize({ target: -20 });
 track.normalize({ target: -14, peakLimit: -1.0 });
 ```
 
-### `track.trimSilence({ threshold?, headMs?, tailMs? })`
+### `track.trimSilence({ thresholdDb?, headMs?, tailMs? })`
 
 Remove leading and trailing silence.
 
 ```typescript
 track.trimSilence({
-  threshold?: number;  // Silence threshold in dB (default: -30)
-  headMs?: number;     // Buffer to keep before content (default: 10)
-  tailMs?: number;     // Buffer to keep after content (default: 50)
+  thresholdDb?: number;  // Silence threshold in dB RMS (default: -30)
+  headMs?: number;       // Buffer to keep before content (default: 10)
+  tailMs?: number;       // Buffer to keep after content (default: 50)
 }): AudioTrack
 ```
 
-Uses windowed RMS scanning (not sample-level detection) for robust silence detection that ignores brief transients.
+Uses fixed 10ms RMS analysis windows internally instead of sample-level detection. Each window is analyzed per channel, and the loudest channel RMS decides whether that window counts as content.
 
 - **Leading trim**: Scans forward with the configured threshold. Keeps `headMs` of buffer before the first loud window for a natural attack.
 - **Trailing trim**: Scans backward with the configured threshold. Keeps `tailMs` of buffer after the last loud window for natural decay.
 
-Returns the original track unchanged if no significant silence is found.
+Returns the original track unchanged if no analysis window crosses the threshold.
 
 ```typescript
 // Sensible defaults
 track.trimSilence();
 
 // More aggressive leading trim
-track.trimSilence({ threshold: -20, headMs: 5 });
+track.trimSilence({ thresholdDb: -20, headMs: 5 });
 
 // Keep more tail for reverb
 track.trimSilence({ tailMs: 200 });
@@ -281,10 +281,10 @@ Apply a linear fade-in from silence.
 track.fadeIn({ ms: number }): AudioTrack
 ```
 
-Ramps gain from 0 to 1 over the specified duration. Use after `trimSilence()` to prevent clicks at the trim point.
+Ramps gain from 0 to 1 over the specified duration. Use it when you need a short cleanup fade after an aggressive trim or when you want an audible fade-in effect.
 
 ```typescript
-track.fadeIn({ ms: 5 }); // 5ms fade-in (click prevention)
+track.fadeIn({ ms: 5 }); // Optional short cleanup fade
 track.fadeIn({ ms: 500 }); // 500ms fade-in (artistic)
 ```
 
@@ -455,8 +455,7 @@ const sfx = await AudioTrack.fromBuffer({ buffer: raw });
 
 const processed = sfx
   .normalize({ target: -14, peakLimit: -1.5 })
-  .trimSilence({ threshold: -30, headMs: 10, tailMs: 50 })
-  .fadeIn({ ms: 5 })
+  .trimSilence({ thresholdDb: -30, headMs: 10, tailMs: 50 })
   .fadeOut({ ms: 10 });
 
 const output = processed.toMp3({ bitrate: 128 });
@@ -528,7 +527,7 @@ For `fromBuffer()`, decoding errors from the underlying codec are passed through
 | ----------------------- | ----------- | ---------------------------- |
 | `normalize.target`      | `-14` LUFS  | EBU R128 foreground          |
 | `normalize.peakLimit`   | `-1.5` dBTP | EBU R128 true peak           |
-| `trimSilence.threshold` | `-30` dB    | Matches ffmpeg silencedetect |
-| `trimSilence.headMs`    | `10` ms     | Natural attack preservation  |
-| `trimSilence.tailMs`    | `50` ms     | Natural decay preservation   |
+| `trimSilence.thresholdDb` | `-30` dB RMS | Windowed silence threshold |
+| `trimSilence.headMs`      | `10` ms      | Natural attack preservation |
+| `trimSilence.tailMs`      | `50` ms      | Natural decay preservation  |
 | `toMp3.bitrate`         | `128` kbps  | Good quality/size balance    |
