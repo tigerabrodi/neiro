@@ -34,6 +34,23 @@ function createPaddedConstantTone(
   return output;
 }
 
+function encodePcmS16le(channels: Int16Array[]): Buffer {
+  const numChannels = channels.length;
+  const numFrames = channels[0]?.length ?? 0;
+  const buffer = Buffer.alloc(numFrames * numChannels * 2);
+  const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+
+  let offset = 0;
+  for (let i = 0; i < numFrames; i++) {
+    for (let ch = 0; ch < numChannels; ch++) {
+      view.setInt16(offset, channels[ch]![i]!, true);
+      offset += 2;
+    }
+  }
+
+  return buffer;
+}
+
 describe("AudioTrack", () => {
   it("full chain: fromBuffer → normalize → trimSilence → fadeOut → toMp3 produces valid MP3", async () => {
     const sampleRate = 44100;
@@ -106,6 +123,75 @@ describe("AudioTrack", () => {
     }
   });
 
+  it("fromPcm returns correct sampleRate, channels, length, and duration", () => {
+    const track = AudioTrack.fromPcm({
+      buffer: encodePcmS16le([
+        new Int16Array([0, 32767, -32768, 16384]),
+        new Int16Array([16384, 0, -16384, 32767]),
+      ]),
+      sampleRate: 48000,
+      channels: 2,
+    });
+
+    expect(track.sampleRate).toBe(48000);
+    expect(track.channels).toBe(2);
+    expect(track.length).toBe(4);
+    expect(track.duration).toBe(4 / 48000);
+  });
+
+  it("fromPcm defaults to mono when channels is omitted", () => {
+    const track = AudioTrack.fromPcm({
+      buffer: encodePcmS16le([new Int16Array([0, 16384, -16384])]),
+      sampleRate: 48000,
+    });
+
+    expect(track.channels).toBe(1);
+    expect(track.length).toBe(3);
+    expect(Array.from(track.getChannel({ index: 0 }))).toEqual([0, 0.5, -0.5]);
+  });
+
+  it("WAV round-trip: fromPcm → toWav → fromBuffer preserves data within 16-bit quantization", async () => {
+    const original = AudioTrack.fromPcm({
+      buffer: encodePcmS16le([
+        new Int16Array([0, 12000, -12000, 32767, -32768]),
+      ]),
+      sampleRate: 48000,
+    });
+
+    const wavBuffer = original.toWav();
+    const roundTripped = await AudioTrack.fromBuffer({ buffer: wavBuffer });
+
+    expect(roundTripped.sampleRate).toBe(48000);
+    expect(roundTripped.channels).toBe(1);
+    expect(roundTripped.length).toBe(original.length);
+
+    const originalData = original.getChannel({ index: 0 });
+    const roundTrippedData = roundTripped.getChannel({ index: 0 });
+
+    for (let i = 0; i < originalData.length; i++) {
+      expect(Math.abs(originalData[i]! - roundTrippedData[i]!)).toBeLessThan(
+        1 / 32768 + 1e-7,
+      );
+    }
+  });
+
+  it("fromPcm → normalize → fadeOut → toWav produces a valid WAV that re-decodes", async () => {
+    const track = AudioTrack.fromPcm({
+      buffer: encodePcmS16le([
+        new Int16Array(Array.from({ length: 480 }, (_, i) => (i % 2 === 0 ? 12000 : -12000))),
+      ]),
+      sampleRate: 48000,
+    });
+
+    const wavBuffer = track.normalize().fadeOut({ ms: 2 }).toWav();
+    const decoded = await AudioTrack.fromBuffer({ buffer: wavBuffer });
+
+    expect(decoded.sampleRate).toBe(48000);
+    expect(decoded.channels).toBe(1);
+    expect(decoded.length).toBe(track.length);
+    expect(decoded.duration).toBeGreaterThan(0);
+  });
+
   it("silence duration: AudioTrack.silence({ durationMs: 1000 }).duration ≈ 1.0", () => {
     const track = AudioTrack.silence({ durationMs: 1000 });
     expect(track.duration).toBeCloseTo(1.0, 2);
@@ -167,11 +253,15 @@ describe("AudioTrack", () => {
     expect(Math.abs(data[data.length - 1]!)).toBeLessThan(0.001);
   });
 
-  it("error cases: getChannel out of bounds throws, concat channel mismatch throws", () => {
+  it("error cases: getChannel out of bounds throws, concat/mix mismatch throws", () => {
     const sampleRate = 44100;
     const mono = AudioTrack.fromChannels({
       channels: [new Float32Array(100)],
       sampleRate,
+    });
+    const mono48k = AudioTrack.fromChannels({
+      channels: [new Float32Array(100)],
+      sampleRate: 48000,
     });
     const stereo = AudioTrack.fromChannels({
       channels: [new Float32Array(100), new Float32Array(100)],
@@ -180,6 +270,17 @@ describe("AudioTrack", () => {
 
     expect(() => mono.getChannel({ index: 99 })).toThrow();
     expect(() => mono.getChannel({ index: -1 })).toThrow();
-    expect(() => mono.concat({ other: stereo })).toThrow();
+    expect(() => mono.concat({ other: mono48k })).toThrow(
+      "Cannot concat tracks with different sample rates",
+    );
+    expect(() => mono.mix({ other: mono48k })).toThrow(
+      "Cannot mix tracks with different sample rates",
+    );
+    expect(() => mono.concat({ other: stereo })).toThrow(
+      "Cannot concat tracks with different channel counts",
+    );
+    expect(() => mono.mix({ other: stereo })).toThrow(
+      "Cannot mix tracks with different channel counts",
+    );
   });
 });

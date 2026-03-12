@@ -238,6 +238,29 @@ decodeMp3(buffer: Buffer): Promise<{ channels: Float32Array[]; sampleRate: numbe
 - Stereo encoding works
 - Default bitrate is 128
 
+#### 2.3 — `src/codecs/pcm.ts`
+
+Raw PCM decode for explicit ingestion paths such as ElevenLabs `pcm_48000`.
+
+```typescript
+decodePcm(opts: {
+  buffer: Buffer;
+  sampleRate: number;
+  channels?: number;
+  format?: "s16le";
+}): { channels: Float32Array[]; sampleRate: number }
+```
+
+**Tests to write:**
+
+- Mono `s16le` decode works
+- Stereo interleaved `s16le` decode works
+- Byte length must be frame-aligned
+- `sampleRate` is preserved
+- `0`, `32767`, and `-32768` map to the expected float values
+- Non-positive `sampleRate` throws
+- Empty but frame-aligned input returns zero-length channels
+
 ---
 
 ### Phase 3: Transforms
@@ -357,6 +380,12 @@ Every public method takes a single object argument (except no-arg methods like `
 class AudioTrack {
   // Construction
   static fromBuffer(opts: { buffer: Buffer }): Promise<AudioTrack>;
+  static fromPcm(opts: {
+    buffer: Buffer;
+    sampleRate: number;
+    channels?: number;
+    format?: "s16le";
+  }): AudioTrack;
   static fromChannels(opts: {
     channels: Float32Array[];
     sampleRate: number;
@@ -402,14 +431,19 @@ class AudioTrack {
 }
 ```
 
+`fromBuffer()` should remain container-based. Raw PCM has no header and must go through `fromPcm()` instead of sniffing.
+
 **Tests to write (integration):**
 
 - Full chain: `fromBuffer → normalize → trimSilence → fadeOut → toMp3` produces valid MP3
 - `fromChannels → toWav → fromBuffer` round-trips correctly
+- `fromPcm → toWav → fromBuffer` round-trips within 16-bit tolerance
+- `fromPcm → normalize → fadeOut → toWav` produces a valid WAV
+- `fromPcm()` returns correct metadata and defaults to mono
 - `silence({ durationMs: 1000 }).duration` is approximately 1.0
 - Immutability: original track is unchanged after transforms
 - Method chaining works: `track.gain({ db: 6 }).fadeIn({ ms: 5 }).fadeOut({ ms: 10 })`
-- Error cases: mismatched concat, invalid channel index
+- Error cases: invalid channel index, mismatched sample rates, mismatched channel counts
 
 #### 4.2 — `src/index.ts`
 

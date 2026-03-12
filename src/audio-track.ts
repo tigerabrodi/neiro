@@ -1,4 +1,5 @@
 import { decodeMp3, encodeMp3 } from "./codecs/mp3";
+import { decodePcm } from "./codecs/pcm";
 import { decodeWav, encodeWav } from "./codecs/wav";
 import { calculateIntegratedLoudness } from "./dsp/lufs";
 import { measureTruePeak } from "./dsp/true-peak";
@@ -49,6 +50,26 @@ export class AudioTrack {
     sampleRate: number;
   }): AudioTrack {
     return new AudioTrack(channels, sampleRate);
+  }
+
+  static fromPcm({
+    buffer,
+    sampleRate,
+    channels = 1,
+    format = "s16le",
+  }: {
+    buffer: Buffer;
+    sampleRate: number;
+    channels?: number;
+    format?: "s16le";
+  }): AudioTrack {
+    const decoded = decodePcm({
+      buffer,
+      sampleRate,
+      channels,
+      format,
+    });
+    return new AudioTrack(decoded.channels, decoded.sampleRate);
   }
 
   static silence({
@@ -168,11 +189,14 @@ export class AudioTrack {
   }
 
   concat({ other }: { other: AudioTrack }): AudioTrack {
-    if (this._channels.length !== other._channels.length) {
-      throw new Error(
-        `Channel count mismatch: ${this._channels.length} vs ${other._channels.length}`,
-      );
+    if (this._sampleRate !== other._sampleRate) {
+      throw new Error("Cannot concat tracks with different sample rates");
     }
+
+    if (this._channels.length !== other._channels.length) {
+      throw new Error("Cannot concat tracks with different channel counts");
+    }
+
     return new AudioTrack(
       concatChannels(this._channels, other._channels),
       this._sampleRate,
@@ -180,6 +204,14 @@ export class AudioTrack {
   }
 
   mix({ other, gainDb }: { other: AudioTrack; gainDb?: number }): AudioTrack {
+    if (this._sampleRate !== other._sampleRate) {
+      throw new Error("Cannot mix tracks with different sample rates");
+    }
+
+    if (this._channels.length !== other._channels.length) {
+      throw new Error("Cannot mix tracks with different channel counts");
+    }
+
     return new AudioTrack(
       mixChannels(this._channels, other._channels, gainDb),
       this._sampleRate,

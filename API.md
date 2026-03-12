@@ -39,13 +39,41 @@ const track = await AudioTrack.fromBuffer({
 
 This is async because decoding compressed audio requires parsing frame headers, Huffman tables, etc. Format is auto-detected from the buffer contents.
 
+Raw PCM is **not** auto-detected here. Raw PCM has no container header, so use `AudioTrack.fromPcm()` when you have `s16le` bytes.
+
 ```typescript
 const track = await AudioTrack.fromBuffer({ buffer });
 ```
 
+### `AudioTrack.fromPcm({ buffer, sampleRate, channels?, format? })`
+
+Create an `AudioTrack` from raw interleaved PCM bytes.
+
+```typescript
+const track = AudioTrack.fromPcm({
+  buffer: Buffer;
+  sampleRate: number;
+  channels?: number;      // default: 1
+  format?: "s16le";       // default: "s16le"
+}): AudioTrack
+```
+
+v1 supports only signed 16-bit little-endian PCM (`"s16le"`), with mono or stereo channel layouts. The PCM is assumed to be interleaved.
+
+```typescript
+const track = AudioTrack.fromPcm({
+  buffer: pcm,
+  sampleRate: 48000,
+  channels: 1,
+  format: "s16le",
+});
+
+const wav = track.toWav();
+```
+
 ### `AudioTrack.fromChannels({ channels, sampleRate })`
 
-Create an `AudioTrack` from raw PCM data. Use this when you already have decoded samples.
+Create an `AudioTrack` from already-decoded normalized sample arrays. Use this when you already have floating-point PCM data.
 
 ```typescript
 const track = AudioTrack.fromChannels({
@@ -343,6 +371,8 @@ const body = await AudioTrack.fromBuffer({ buffer: bodyMp3 });
 const full = intro.concat({ other: body });
 ```
 
+Throws `Cannot concat tracks with different sample rates` or `Cannot concat tracks with different channel counts` if the tracks are incompatible.
+
 ### `track.mix({ other, gainDb? })`
 
 Mix (overlay) another track on top of this one.
@@ -362,6 +392,8 @@ const dialogue = await AudioTrack.fromBuffer({ buffer: dialogueMp3 });
 const ambience = await AudioTrack.fromBuffer({ buffer: ambienceMp3 });
 const mixed = dialogue.mix({ other: ambience, gainDb: -6 });
 ```
+
+Throws `Cannot mix tracks with different sample rates` or `Cannot mix tracks with different channel counts` if the tracks are incompatible.
 
 ### `track.reverse()`
 
@@ -461,6 +493,21 @@ const processed = sfx
 const output = processed.toMp3({ bitrate: 128 });
 ```
 
+### Convert raw PCM into WAV for a one-shot SFX
+
+```typescript
+const track = AudioTrack.fromPcm({
+  buffer: pcm,
+  sampleRate: 48000,
+  channels: 1,
+  format: "s16le",
+});
+
+const wavBuffer = track.toWav();
+```
+
+This is the primary `pcm_48000` path for short one-shot assets. Keep the track at 48 kHz end-to-end to avoid unnecessary conversion.
+
 ### Prepare background music
 
 ```typescript
@@ -512,12 +559,16 @@ neiro throws standard `Error` instances with descriptive messages:
 | Error                                                  | When                                                          |
 | ------------------------------------------------------ | ------------------------------------------------------------- |
 | `"Unsupported sample rate for K-weighting: {rate}Hz"`  | LUFS measurement with a sample rate other than 44100 or 48000 |
-| `"Cannot concat tracks with different sample rates"`   | `concat()` or `mix()` with mismatched sample rates            |
-| `"Cannot concat tracks with different channel counts"` | `concat()` or `mix()` with mismatched channel counts          |
+| `"Sample rate must be positive"`                       | `fromPcm()` with `sampleRate <= 0`                            |
+| `"PCM buffer length must be divisible by frame size"`  | `fromPcm()` with non-frame-aligned PCM input                  |
+| `"Cannot concat tracks with different sample rates"`   | `concat()` with mismatched sample rates                       |
+| `"Cannot concat tracks with different channel counts"` | `concat()` with mismatched channel counts                     |
+| `"Cannot mix tracks with different sample rates"`      | `mix()` with mismatched sample rates                          |
+| `"Cannot mix tracks with different channel counts"`    | `mix()` with mismatched channel counts                        |
 | `"Channel index out of range"`                         | `getChannel()` with an invalid index                          |
 | `"Speed rate must be positive"`                        | `speed()` with zero or negative rate                          |
 
-For `fromBuffer()`, decoding errors from the underlying codec are passed through.
+For `fromBuffer()`, decoding errors from the underlying codec are passed through. Raw PCM should go through `fromPcm()`, not `fromBuffer()`.
 
 ---
 
@@ -530,4 +581,6 @@ For `fromBuffer()`, decoding errors from the underlying codec are passed through
 | `trimSilence.thresholdDb` | `-30` dB RMS | Windowed silence threshold |
 | `trimSilence.headMs`      | `10` ms      | Natural attack preservation |
 | `trimSilence.tailMs`      | `50` ms      | Natural decay preservation  |
+| `fromPcm.channels`        | `1`          | Mono raw PCM input          |
+| `fromPcm.format`          | `"s16le"`    | Signed 16-bit little-endian |
 | `toMp3.bitrate`         | `128` kbps  | Good quality/size balance    |

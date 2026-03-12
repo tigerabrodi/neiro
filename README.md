@@ -32,6 +32,20 @@ const result = track
 writeFileSync("output.mp3", result.toMp3());
 ```
 
+For raw `pcm_48000` one-shot SFX, use `fromPcm()` and export WAV directly:
+
+```typescript
+const pcm = readFileSync("input.pcm");
+const track = AudioTrack.fromPcm({
+  buffer: pcm,
+  sampleRate: 48000,
+  channels: 1,
+  format: "s16le",
+});
+
+writeFileSync("output.wav", track.toWav());
+```
+
 ## Why
 
 Audio files from different sources come in at wildly different volumes, with padding, with clipping. Fixing this usually means reaching for ffmpeg (heavy, binary dependency) or cobbling together multiple npm packages.
@@ -47,6 +61,12 @@ Every method takes a single object argument — you always know what each value 
 ```typescript
 // Load
 const track = await AudioTrack.fromBuffer({ buffer: mp3OrWavBuffer });
+const track = AudioTrack.fromPcm({
+  buffer: pcmBuffer,
+  sampleRate: 48000,
+  channels: 1,
+  format: "s16le",
+});
 const track = AudioTrack.fromChannels({
   channels: [leftSamples],
   sampleRate: 44100,
@@ -79,6 +99,8 @@ track.toWav(); // Buffer
 track.toPcm(); // { channels: Float32Array[], sampleRate }
 ```
 
+`fromBuffer()` does not sniff raw PCM. Raw PCM has no header, so use `fromPcm()` when you already know the sample format.
+
 `trimSilence()` uses internal 10ms RMS analysis windows, with defaults of `thresholdDb: -30`, `headMs: 10`, and `tailMs: 50`. It trims based on window loudness rather than individual sample peaks, which makes it more stable around brief transients.
 
 All transforms chain:
@@ -103,6 +125,21 @@ const processed = sfx
   .fadeOut({ ms: 10 });
 const output = processed.toMp3();
 ```
+
+### Ingest raw PCM for a one-shot SFX
+
+```typescript
+const track = AudioTrack.fromPcm({
+  buffer: pcm,
+  sampleRate: 48000,
+  channels: 1,
+  format: "s16le",
+});
+
+const wav = track.toWav();
+```
+
+This is the intended `pcm_48000` path for short one-shot assets. Keep everything at 48 kHz end-to-end, and only `concat()` or `mix()` tracks that already share the same sample rate and channel count.
 
 ### Prepare background music
 
