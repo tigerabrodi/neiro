@@ -19,7 +19,7 @@ const result = track
 const output = result.toMp3({ bitrate: 128 });
 ```
 
-Every method takes a single object argument. This gives you type safety and autocomplete at every call site — you always know what each value means.
+Methods that take options use a single object argument. No-arg methods like `reverse()`, `toMono()`, and `toStereo()` stay no-arg.
 
 Every transform returns a **new** `AudioTrack`. The original is never mutated.
 
@@ -77,7 +77,7 @@ Create an `AudioTrack` from already-decoded normalized sample arrays. Use this w
 
 ```typescript
 const track = AudioTrack.fromChannels({
-  channels: Float32Array[];  // [left] for mono, [left, right] for stereo
+  channels: Float32Array[];  // One Float32Array per channel
   sampleRate: number;
 }): AudioTrack
 ```
@@ -132,7 +132,7 @@ Read-only properties on every `AudioTrack` instance.
 | ------------ | -------- | -------------------------------------- |
 | `duration`   | `number` | Duration in seconds                    |
 | `sampleRate` | `number` | Sample rate in Hz (e.g., 44100, 48000) |
-| `channels`   | `number` | Channel count (1 = mono, 2 = stereo)   |
+| `channels`   | `number` | Channel count                          |
 | `length`     | `number` | Total samples per channel              |
 
 ```typescript
@@ -221,7 +221,7 @@ const rightSamples = track.getChannel({ index: 1 });
 
 ## Transforms
 
-Every transform returns a new `AudioTrack`. They can be chained. Every method takes a single object argument.
+Every transform returns a new `AudioTrack`. They can be chained. Methods that take options use a single object argument.
 
 ### `track.gain({ db })`
 
@@ -355,6 +355,54 @@ track.slice({ startMs: 1000 });
 track.slice({ startMs: 3000, endMs: 3500 });
 ```
 
+### `track.resample({ sampleRate })`
+
+Explicitly resample the track to a new sample rate.
+
+```typescript
+track.resample({
+  sampleRate: number;
+}): AudioTrack
+```
+
+Uses linear interpolation in v1. Preserves channel count and preserves duration as closely as possible. Resampling to the same sample rate still returns a new copied track.
+
+Throws `resample sampleRate must be a finite positive number` if `sampleRate` is not finite or is less than or equal to zero.
+
+```typescript
+const resampled = track.resample({ sampleRate: 48000 });
+```
+
+### `track.toMono()`
+
+Downmix the track to mono. Takes no arguments.
+
+```typescript
+track.toMono(): AudioTrack
+```
+
+Averages all channels equally per frame. Works for mono, stereo, and multi-channel inputs. Mono input still returns a new copied mono track.
+
+```typescript
+const mono = track.toMono();
+```
+
+### `track.toStereo()`
+
+Convert the track to stereo. Takes no arguments.
+
+```typescript
+track.toStereo(): AudioTrack
+```
+
+- Mono input: duplicates the mono channel into left and right.
+- Stereo input: returns a new copied stereo track.
+- More than 2 channels: first downmixes to mono with the same averaging rule as `toMono()`, then duplicates into stereo.
+
+```typescript
+const stereo = track.toStereo();
+```
+
 ### `track.concat({ other })`
 
 Join two tracks end-to-end.
@@ -363,7 +411,7 @@ Join two tracks end-to-end.
 track.concat({ other: AudioTrack }): AudioTrack
 ```
 
-The tracks must have the same sample rate and channel count. Throws if they don't match.
+The tracks must have the same sample rate and channel count. Throws if they don't match. `concat()` does not resample or convert channels implicitly.
 
 ```typescript
 const intro = await AudioTrack.fromBuffer({ buffer: introMp3 });
@@ -384,7 +432,7 @@ track.mix({
 }): AudioTrack
 ```
 
-Adds the samples together. The output length is the longer of the two tracks. The tracks must have the same sample rate and channel count.
+Adds the samples together. The output length is the longer of the two tracks. The tracks must have the same sample rate and channel count. `mix()` does not resample or convert channels implicitly.
 
 ```typescript
 // Layer background ambience under dialogue
@@ -521,6 +569,22 @@ const processed = music
 const output = processed.toMp3({ bitrate: 192 });
 ```
 
+### Normalize formats before concat or mix
+
+```typescript
+const normalized = track
+  .toStereo()
+  .resample({ sampleRate: 48000 });
+
+const padded = AudioTrack.silence({
+  durationMs: 500,
+  sampleRate: normalized.sampleRate,
+  channels: normalized.channels,
+}).concat({ other: normalized });
+```
+
+For inputs with more than 2 channels, `toStereo()` uses a simple downmix-to-mono-then-duplicate rule.
+
 ### Build a sequence with gaps
 
 ```typescript
@@ -528,6 +592,7 @@ const beep = await AudioTrack.fromBuffer({ buffer: beepMp3 });
 const gap = AudioTrack.silence({
   durationMs: 300,
   sampleRate: beep.sampleRate,
+  channels: beep.channels,
 });
 
 const sequence = beep
@@ -561,6 +626,7 @@ neiro throws standard `Error` instances with descriptive messages:
 | `"Unsupported sample rate for K-weighting: {rate}Hz"`  | LUFS measurement with a sample rate other than 44100 or 48000 |
 | `"Sample rate must be positive"`                       | `fromPcm()` with `sampleRate <= 0`                            |
 | `"PCM buffer length must be divisible by frame size"`  | `fromPcm()` with non-frame-aligned PCM input                  |
+| `"resample sampleRate must be a finite positive number"` | `resample()` with `0`, negative, `NaN`, or `Infinity`         |
 | `"Cannot concat tracks with different sample rates"`   | `concat()` with mismatched sample rates                       |
 | `"Cannot concat tracks with different channel counts"` | `concat()` with mismatched channel counts                     |
 | `"Cannot mix tracks with different sample rates"`      | `mix()` with mismatched sample rates                          |

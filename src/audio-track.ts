@@ -3,11 +3,13 @@ import { decodePcm } from "./codecs/pcm";
 import { decodeWav, encodeWav } from "./codecs/wav";
 import { calculateIntegratedLoudness } from "./dsp/lufs";
 import { measureTruePeak } from "./dsp/true-peak";
+import { downmixToMono, upmixMonoToStereo } from "./transforms/channels";
 import { concatChannels } from "./transforms/concat";
 import { applyFadeIn, applyFadeOut } from "./transforms/fade";
 import { applyGain } from "./transforms/gain";
 import { mixChannels } from "./transforms/mix";
 import { normalizeLoudness } from "./transforms/normalize";
+import { resampleChannels } from "./transforms/resample";
 import { reverseChannels } from "./transforms/reverse";
 import { sliceChannels } from "./transforms/slice";
 import { changeSpeed } from "./transforms/speed";
@@ -184,6 +186,44 @@ export class AudioTrack {
   slice({ startMs, endMs }: { startMs: number; endMs?: number }): AudioTrack {
     return new AudioTrack(
       sliceChannels(this._channels, this._sampleRate, startMs, endMs),
+      this._sampleRate,
+    );
+  }
+
+  resample({ sampleRate }: { sampleRate: number }): AudioTrack {
+    return new AudioTrack(
+      resampleChannels(this._channels, {
+        sourceSampleRate: this._sampleRate,
+        targetSampleRate: sampleRate,
+      }),
+      sampleRate,
+    );
+  }
+
+  toMono(): AudioTrack {
+    return new AudioTrack([downmixToMono(this._channels)], this._sampleRate);
+  }
+
+  toStereo(): AudioTrack {
+    if (this._channels.length === 1) {
+      return new AudioTrack(
+        upmixMonoToStereo(this._channels[0]!),
+        this._sampleRate,
+      );
+    }
+
+    if (this._channels.length === 2) {
+      return new AudioTrack(
+        [
+          Float32Array.from(this._channels[0]!),
+          Float32Array.from(this._channels[1]!),
+        ],
+        this._sampleRate,
+      );
+    }
+
+    return new AudioTrack(
+      upmixMonoToStereo(downmixToMono(this._channels)),
       this._sampleRate,
     );
   }

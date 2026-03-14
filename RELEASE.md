@@ -69,7 +69,7 @@ To create the tarball locally and inspect it:
 
 ```bash
 npm pack
-tar -tzf neiro-0.2.0.tgz
+tar -tzf neiro-0.4.0.tgz
 ```
 
 ## Test the Package Locally
@@ -85,7 +85,7 @@ npm pack
 
 # 3. In another project, install from the tarball
 cd /path/to/test-project
-bun add /path/to/neiro/neiro-0.2.0.tgz
+bun add /path/to/neiro/neiro-0.4.0.tgz
 ```
 
 Then write a quick test script:
@@ -136,7 +136,7 @@ npm whoami
 
 ```bash
 # Make sure version is correct in package.json
-# (currently 0.2.0 for the trimSilence API rewrite release)
+# (currently 0.4.0 for the explicit format conversion release)
 
 # Build
 bun run build
@@ -169,6 +169,7 @@ Follow [semver](https://semver.org/):
 - **0.x.y** — Pre-1.0, anything can change. Use this while iterating on the API.
 - **0.1.0** — First usable release. API is defined but may evolve.
 - **0.2.0** — Breaking `trimSilence` API rewrite: `thresholdDb` + RMS-window detection.
+- **0.4.0** — Explicit `resample()`, `toMono()`, and `toStereo()` conversion primitives.
 - **1.0.0** — Stable API. You're committing to backwards compatibility.
 
 Suggested milestones:
@@ -178,6 +179,7 @@ Suggested milestones:
 | `0.1.0` | Initial public release                                     |
 | `0.2.0` | Breaking `trimSilence` rewrite to `thresholdDb` + RMS trim |
 | `0.3.0` | Performance optimizations, edge case fixes                 |
+| `0.4.0` | Explicit resample and channel-conversion primitives        |
 | `1.0.0` | Battle-tested in production, API is stable                 |
 
 ## Dependencies
@@ -200,7 +202,7 @@ After publishing to npm, create a GitHub release:
 git push origin main --tags
 
 # Create release on GitHub
-gh release create v0.2.0 --title "v0.2.0" --notes "Breaking trimSilence API rewrite"
+gh release create v0.4.0 --title "v0.4.0" --notes "Add explicit resample and channel-conversion APIs"
 ```
 
 ## Troubleshooting

@@ -56,7 +56,7 @@ Two small runtime dependencies handle MP3 codec work: `lamejs` for encoding and 
 
 ## API at a Glance
 
-Every method takes a single object argument — you always know what each value means, and you get full autocomplete.
+Methods that take options use a single object argument, while no-arg methods like `reverse()`, `toMono()`, and `toStereo()` stay no-arg.
 
 ```typescript
 // Load
@@ -79,7 +79,7 @@ track.truePeak(); // True peak in dBTP (4x oversampled)
 track.rms(); // RMS level in dB
 track.duration; // Seconds
 track.sampleRate; // Hz
-track.channels; // 1 (mono) or 2 (stereo)
+track.channels; // Channel count
 
 // Transform (each returns a new AudioTrack — immutable)
 track.normalize({ target: -14, peakLimit: -1.5 });
@@ -88,6 +88,9 @@ track.gain({ db: 6 }); // +6 dB
 track.fadeIn({ ms: 5 }); // 5ms fade-in
 track.fadeOut({ ms: 10 }); // 10ms fade-out
 track.slice({ startMs: 0, endMs: 2000 }); // First 2 seconds
+track.resample({ sampleRate: 48000 }); // Change sample rate explicitly
+track.toMono(); // Downmix by averaging channels
+track.toStereo(); // Mono -> stereo, or downmix multi-channel then duplicate
 track.concat({ other }); // Join end-to-end
 track.mix({ other }); // Overlay
 track.reverse();
@@ -102,6 +105,8 @@ track.toPcm(); // { channels: Float32Array[], sampleRate }
 `fromBuffer()` does not sniff raw PCM. Raw PCM has no header, so use `fromPcm()` when you already know the sample format.
 
 `trimSilence()` uses internal 10ms RMS analysis windows, with defaults of `thresholdDb: -30`, `headMs: 10`, and `tailMs: 50`. It trims based on window loudness rather than individual sample peaks, which makes it more stable around brief transients.
+
+`concat()` and `mix()` stay strict. They do not resample or convert channel layouts implicitly, so use `toMono()`, `toStereo()`, and `resample()` when you need to normalize tracks intentionally first.
 
 All transforms chain:
 
@@ -152,6 +157,22 @@ const processed = music
 const output = processed.toMp3({ bitrate: 192 });
 ```
 
+### Normalize formats before concat or mix
+
+```typescript
+const normalized = track
+  .toStereo()
+  .resample({ sampleRate: 48000 });
+
+const padded = AudioTrack.silence({
+  durationMs: 500,
+  sampleRate: normalized.sampleRate,
+  channels: normalized.channels,
+}).concat({ other: normalized });
+```
+
+`toStereo()` uses a simple downmix-to-mono-then-duplicate rule for inputs with more than 2 channels.
+
 ### Analyze loudness
 
 ```typescript
@@ -168,6 +189,7 @@ const beep = await AudioTrack.fromBuffer({ buffer: beepMp3 });
 const gap = AudioTrack.silence({
   durationMs: 300,
   sampleRate: beep.sampleRate,
+  channels: beep.channels,
 });
 const sequence = beep
   .concat({ other: gap })
